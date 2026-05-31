@@ -1,10 +1,17 @@
-CREATE TABLE stocks (
+CREATE TABLE companies (
     id SERIAL PRIMARY KEY,
-    symbol VARCHAR(50) NOT NULL UNIQUE,
+    isin VARCHAR(20) UNIQUE NOT NULL,
     company_name VARCHAR(255) NOT NULL,
     sector VARCHAR(100),
     industry VARCHAR(100),
-    isin VARCHAR(20) UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE listings (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies (id),
+    exchange VARCHAR(10) NOT NULL,
+    symbol VARCHAR(50) NOT NULL,
+    exchange_code VARCHAR(50),
+    UNIQUE (exchange, symbol)
 );
