@@ -1,0 +1,10 @@
+CREATE TABLE stocks (
+    id SERIAL PRIMARY KEY,
+    symbol VARCHAR(50) NOT NULL UNIQUE,
+    company_name VARCHAR(255) NOT NULL,
+    sector VARCHAR(100),
+    industry VARCHAR(100),
+    isin VARCHAR(20) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
