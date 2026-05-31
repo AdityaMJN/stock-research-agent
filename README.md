@@ -1,90 +1,46 @@
 # Stock Research Agent
-Current Status (Completed)
 
-✅ NSE company universe imported
-✅ Historical prices downloaded
-✅ Technical indicators calculated
-✅ Momentum screener implemented
-✅ Results persistence implemented
+## Overview
 
-Current Database Size:
-- daily_prices: 2,363,884 rows
-- technical_indicators: 2,363,820 rows
-- screener_results: 100 Momentum rankings
+Stock Research Agent is a data-driven stock screening, ranking, and research platform built around a PostgreSQL market database and a Python analytics engine.
 
+The project is designed to maintain its own market data infrastructure rather than relying on external screening websites. All indicators, screeners, rankings, and backtests are generated from internally stored historical data.
 
-## Project Vision
-
-The goal of this project is to build a complete stock research and screening platform capable of identifying investment opportunities for:
-
-* Long-term investing
-* Swing trading
-* Position trading
-* Intraday trading (future phase)
-
-The project is designed as a data-first platform. Instead of relying on third-party screeners, all market data, indicators, rankings, and screening logic are generated and stored within our own PostgreSQL database.
-
-The long-term objective is to build an intelligent stock-selection engine that combines:
+The long-term vision is to evolve the platform into a complete stock intelligence system capable of:
 
 * Technical Analysis
 * Fundamental Analysis
-* Market Breadth
-* Sector Rotation
-* News and Sentiment
-* AI-based Ranking and Explanation
-
-The current system focuses on building a strong technical-analysis foundation before moving into fundamentals and AI.
+* Market Breadth Analysis
+* Sector Rotation Analysis
+* Backtesting
+* Portfolio Research
+* AI-Assisted Investment Research
 
 ---
 
-# Current Architecture
+# Current Status
 
 ## Data Layer
 
 ### Companies
 
-Stores the master company information.
+Stores master company information.
 
-Fields:
+Current Records:
 
-* Company ID
-* Company Name
-* ISIN
-* Sector (future)
-* Industry (future)
-
-Purpose:
-
-A company exists only once regardless of the exchange on which it trades.
-
----
+* ~2164 NSE companies
 
 ### Listings
 
-Stores exchange-specific information.
+Stores exchange-specific trading information.
 
-Fields:
+Current Records:
 
-* Listing ID
-* Company ID
-* Exchange
-* Symbol
-* Yahoo Symbol
-
-Examples:
-
-* TCS → NSE:TCS
-* TCS → BSE:532540
-
-Purpose:
-
-Allows support for multiple exchanges while keeping a single company record.
-
----
+* ~2364 listings
 
 ### Daily Prices
 
-Stores historical market data.
+Stores historical OHLCV data.
 
 Fields:
 
@@ -103,22 +59,18 @@ Current Size:
 
 Data Source:
 
-Yahoo Finance
+* Yahoo Finance
 
 Coverage:
 
-Approximately 5 years of historical data for the NSE universe.
-
----
+* Approximately 5 years of historical data
 
 ### Technical Indicators
 
 Stores calculated technical indicators.
 
-Fields:
+Indicators:
 
-* Listing ID
-* Trade Date
 * SMA20
 * SMA50
 * SMA200
@@ -128,15 +80,13 @@ Current Size:
 
 * 2,363,820 rows
 
-Purpose:
+Coverage:
 
-Allows fast screening without recalculating indicators repeatedly.
-
----
+* ~2359 actively calculated listings
 
 ### Screener Results
 
-Stores outputs from various screeners.
+Stores ranked screener outputs.
 
 Fields:
 
@@ -144,26 +94,52 @@ Fields:
 * Listing ID
 * Trade Date
 * Score
-
-Current Use:
-
-Momentum Screener
+* Created At
 
 Purpose:
 
-Acts as a cache layer for ranked stocks.
+Acts as a cached ranking layer for stock selection.
+
+---
+
+# Architecture
+
+```text
+Companies
+    ↓
+Listings
+    ↓
+Daily Prices
+    ↓
+Technical Indicators
+    ↓
+Views
+    ├── latest_stock_snapshot
+    ├── stock_52w_stats
+    └── golden_cross_candidates
+    ↓
+Screeners
+    ├── Momentum
+    ├── Strong Uptrend
+    ├── 52 Week High
+    └── Golden Cross
+    ↓
+Combined Ranking
+    ↓
+Backtesting
+```
 
 ---
 
 # Data Ingestion Pipeline
 
-## Company Import
+## NSE Universe Import
 
 Source:
 
-NSE Equity Master CSV
+* NSE Equity Master List
 
-Imported:
+Imported Data:
 
 * Company Name
 * Symbol
@@ -171,199 +147,347 @@ Imported:
 
 Result:
 
-Approximately 2164 companies loaded.
+* ~2164 companies imported
 
 ---
 
-## Historical Price Download
+## Historical Price Import
 
 Source:
 
-Yahoo Finance
+* Yahoo Finance
 
 Process:
 
-1. Read all listings.
-2. Download historical data.
-3. Store into daily_prices.
-4. Handle failures separately.
+1. Load listings
+2. Download historical data
+3. Store in daily_prices
+4. Skip duplicates automatically
 
-Results:
+Result:
 
-* 2364 listings processed.
-* 40 failures.
-* 98%+ success rate.
-
-Total Download Time:
-
-~47 minutes.
+* ~2364 listings processed
+* ~98% success rate
 
 ---
 
-## Indicator Calculation
+## Daily Incremental Price Update
 
-Indicators Calculated:
+Implemented:
+
+```text
+ingestion/daily_price_update.py
+```
+
+Features:
+
+* Detects latest stored trade date
+* Downloads only missing data
+* Avoids duplicate inserts
+* Suitable for daily automation
+
+---
+
+# Technical Indicator Engine
+
+Implemented Indicators:
 
 * SMA20
 * SMA50
 * SMA200
 * RSI14
 
-Method:
+Files:
 
-1. Load prices for one stock.
-2. Calculate indicators using Python.
-3. Bulk insert results into PostgreSQL.
+```text
+calculations/
+├── calculate_all_indicators.py
+└── update_indicators.py
+```
 
-Coverage:
+### Full Rebuild
 
-* 2359 listings.
-* 2.36 million indicator records.
+```text
+calculate_all_indicators.py
+```
 
----
+Recalculates the entire indicator database.
 
-# Current Screening Engine
+### Incremental Update
 
-## Momentum Screener
+```text
+update_indicators.py
+```
 
-Current Formula:
+Updates only newly available indicator records.
 
-Momentum Score =
-40% × 3-Month Return +
-60% × 6-Month Return
-
-Filters:
-
-* Minimum history = 126 trading days
-* Current price > ₹20
-* Price 6 months ago > ₹20
-
-Output:
-
-Top 100 stocks stored in screener_results.
-
-Purpose:
-
-Identify stocks with the strongest medium-term price appreciation.
+Used by the daily pipeline.
 
 ---
 
-# What Has Been Achieved
+# Database Views
 
-The project has successfully moved beyond simple data collection.
+## latest_stock_snapshot
 
-We now have:
+Provides one latest row per stock containing:
 
-* Historical price database
-* Technical indicator engine
-* Momentum ranking engine
-* Persistent screener results
-
-This allows us to generate stock candidates directly from our own database without relying on external screening websites.
-
----
-
-# Next Development Targets
-
-## Phase 1 – Advanced Technical Screening
-
-### Strong Uptrend Screener
-
-Conditions:
-
-* Close > SMA20
-* SMA20 > SMA50
-* SMA50 > SMA200
-* RSI > 60
-
-Goal:
-
-Identify stocks in confirmed uptrends.
-
----
-
-### Golden Cross Screener
-
-Condition:
-
-SMA50 > SMA200
-
-Goal:
-
-Identify long-term trend reversals.
-
----
-
-### 52 Week High Screener
-
-Condition:
-
-Price within 5% of 52-week high.
-
-Goal:
-
-Identify potential breakout candidates.
-
----
-
-### Oversold Screener
-
-Condition:
-
-RSI < 30
-
-Goal:
-
-Identify potential recovery candidates.
-
----
-
-### Relative Strength Ranking
-
-Rank stocks using:
-
-* 3 Month Return
-* 6 Month Return
-* 12 Month Return
-
-Goal:
-
-Create market-wide strength rankings.
-
----
-
-## Phase 2 – Market Snapshot Layer
-
-Create a consolidated snapshot containing one row per stock.
-
-Fields:
-
-* Symbol
-* Company Name
 * Close Price
 * SMA20
 * SMA50
 * SMA200
 * RSI14
-* 3M Return
-* 6M Return
-* Momentum Score
 
 Purpose:
 
-Allow all screeners to run against a single optimized dataset.
+Fast screening layer.
 
 ---
 
-## Phase 3 – Fundamental Analysis
+## stock_52w_stats
 
-New Tables:
+Provides:
 
-* annual_financials
-* quarterly_financials
-* balance_sheet
-* cash_flow
-* shareholding_pattern
+* 52 Week High
+
+Purpose:
+
+Used by breakout screeners.
+
+---
+
+## golden_cross_candidates
+
+Provides:
+
+* Historical SMA50 / SMA200 crossover events
+
+Purpose:
+
+Used by Golden Cross screening.
+
+---
+
+# Screening Engine
+
+## Momentum Screener
+
+Measures medium-term price strength.
+
+Scoring:
+
+```text
+40% × 3 Month Return
+60% × 6 Month Return
+```
+
+Output:
+
+* Top 100 stocks
+
+Purpose:
+
+Identify stocks with strongest momentum.
+
+---
+
+## Strong Uptrend Screener
+
+Conditions:
+
+```text
+Close > SMA20
+SMA20 > SMA50
+SMA50 > SMA200
+RSI14 > 60
+```
+
+Current Results:
+
+* ~180 stocks
+
+Purpose:
+
+Identify established uptrends.
+
+---
+
+## 52 Week High Screener
+
+Condition:
+
+```text
+Close >= 95% of 52 Week High
+```
+
+Current Results:
+
+* ~165 stocks
+
+Purpose:
+
+Identify breakout candidates and market leaders.
+
+---
+
+## Golden Cross Screener
+
+Condition:
+
+```text
+Yesterday:
+SMA50 <= SMA200
+
+Today:
+SMA50 > SMA200
+```
+
+Purpose:
+
+Identify emerging long-term uptrends.
+
+---
+
+# Combined Ranking Engine
+
+The platform combines multiple independent signals.
+
+Current Weighting:
+
+```text
+Momentum            35
+Strong Uptrend      30
+52 Week High        20
+Golden Cross        15
+----------------------
+Maximum Score      100
+```
+
+Output:
+
+```text
+COMBINED_RANKING
+```
+
+Purpose:
+
+Generate a ranked list of the strongest stocks in the market.
+
+---
+
+# Daily Automation Pipeline
+
+Implemented:
+
+```text
+jobs/daily_update.py
+```
+
+Single Command:
+
+```bash
+python -m jobs.daily_update
+```
+
+Pipeline:
+
+```text
+Update Prices
+    ↓
+Update Indicators
+    ↓
+Momentum Screener
+    ↓
+Strong Uptrend Screener
+    ↓
+52 Week High Screener
+    ↓
+Golden Cross Screener
+    ↓
+Combined Ranking
+```
+
+---
+
+# Backtesting Framework
+
+Implemented:
+
+```text
+backtesting/
+├── utils.py
+└── backtest_strong_uptrend.py
+```
+
+Purpose:
+
+Validate whether screening strategies actually outperform over historical periods.
+
+## First Backtest Results
+
+Strategy:
+
+* Strong Uptrend
+* Top 20 Stocks
+* Monthly Rebalance
+* 90 Day Holding Period
+
+Results:
+
+```text
+Periods Tested : 23
+Average Return : 28.04%
+Median Return  : 26.78%
+Best Return    : 113.52%
+Worst Return   : -28.83%
+Win Rate       : 91.30%
+```
+
+Note:
+
+These results are preliminary and require additional validation against survivorship bias and other backtesting artifacts.
+
+---
+
+# Current Project Milestones
+
+Completed:
+
+* NSE Universe Import
+* Historical Price Database
+* Daily Price Updater
+* Technical Indicator Engine
+* Momentum Screener
+* Strong Uptrend Screener
+* 52 Week High Screener
+* Golden Cross Screener
+* Combined Ranking Engine
+* Daily Automated Pipeline
+* Backtesting Framework V1
+
+---
+
+# Next Development Targets
+
+## Phase 1 – Backtesting Expansion
+
+* Momentum Backtest
+* 52 Week High Backtest
+* Combined Ranking Backtest
+* CAGR Calculation
+* Drawdown Analysis
+* Benchmark Comparison
+* Equity Curve Generation
+
+---
+
+## Phase 2 – Fundamental Data Layer
+
+New Data Sources:
+
+* Financial Statements
+* Balance Sheets
+* Cash Flows
+* Shareholding Patterns
 
 Metrics:
 
@@ -375,13 +499,9 @@ Metrics:
 * Earnings Growth
 * Free Cash Flow
 
-Goal:
-
-Build a quality ranking engine.
-
 ---
 
-## Phase 4 – Combined Ranking Engine
+## Phase 3 – Technical + Fundamental Ranking
 
 Combine:
 
@@ -389,53 +509,45 @@ Technical Score
 
 * Momentum
 * Trend
-* Relative Strength
+* Breakout Strength
 
 Fundamental Score
 
-* ROE
-* ROCE
+* Quality
 * Growth
-* Debt
+* Valuation
 
 Output:
 
-Unified Stock Score
-
-Goal:
-
-Generate a ranked investment universe.
+* Unified Stock Score
 
 ---
 
-## Phase 5 – AI Layer
+## Phase 4 – AI Research Layer
 
-AI will not choose stocks directly.
+AI will assist by:
 
-Instead it will:
+* Explaining rankings
+* Summarizing companies
+* Identifying strengths
+* Highlighting risks
+* Generating research reports
 
-* Explain rankings
-* Identify strengths
-* Identify risks
-* Summarize company performance
-* Explain why a stock appears in a screener
-
-Goal:
-
-AI becomes an analyst rather than a decision maker.
+AI acts as a research assistant, not a decision maker.
 
 ---
 
 # Long-Term Vision
 
-The final system should function as a complete stock intelligence platform capable of:
+The final platform will function as a complete stock intelligence system capable of:
 
-* Data Collection
+* Market Data Collection
 * Technical Analysis
 * Fundamental Analysis
-* Ranking
 * Screening
+* Ranking
 * Backtesting
-* AI-Based Research Assistance
+* Portfolio Research
+* AI-Assisted Stock Research
 
-The database and ranking engine are the core assets of the platform. AI serves as an enhancement layer on top of a reliable and independently maintained market data infrastructure.
+The core asset of the platform is the proprietary market database, ranking engine, and research framework built entirely in-house.

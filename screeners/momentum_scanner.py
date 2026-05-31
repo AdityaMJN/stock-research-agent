@@ -17,7 +17,7 @@ def calculate_return(current_price, old_price):
     return ((current_price - old_price) / old_price) * 100
 
 
-def main():
+def run():
 
     listings = pd.read_sql(
         """
@@ -221,6 +221,9 @@ def main():
         f"Saved {len(records)} "
         f"Momentum results"
     )
+
+def main():
+    run()
 
 
 if __name__ == "__main__":

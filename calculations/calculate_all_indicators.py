@@ -103,7 +103,7 @@ def insert_indicators(listing_id: int, df: pd.DataFrame):
         )
 
 
-def main():
+def run():
 
     start_time = time.time()
 
@@ -178,6 +178,10 @@ def main():
     print(f"Total Listings     : {total_listings}")
     print(f"Time Taken         : {elapsed:.2f} seconds")
     print("====================================")
+
+
+def main():
+    run()
 
 
 if __name__ == "__main__":

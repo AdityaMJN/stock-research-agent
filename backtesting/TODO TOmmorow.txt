@@ -1,0 +1,230 @@
+Progress saved.
+
+## Current Project Status
+
+```text
+Data Layer
+✓ NSE company import
+✓ Listings import
+✓ Historical price ingestion
+✓ Incremental daily price updater
+
+Indicators
+✓ SMA20
+✓ SMA50
+✓ SMA200
+✓ RSI14
+✓ Full indicator rebuild
+✓ Incremental indicator updater
+
+Views
+✓ latest_stock_snapshot
+✓ stock_52w_stats
+✓ golden_cross_candidates
+
+Screeners
+✓ Momentum
+✓ Strong Uptrend
+✓ 52 Week High
+✓ Golden Cross
+
+Ranking
+✓ Combined Ranking
+
+Automation
+✓ jobs.daily_update
+
+Backtesting
+✓ Framework V1
+✓ Strong Uptrend Backtest
+
+Latest Backtest Result
+Periods Tested : 23
+Average Return : 28.04%
+Median Return  : 26.78%
+Best Return    : 113.52%
+Worst Return   : -28.83%
+Win Rate       : 91.30%
+```
+
+---
+
+# Tomorrow's To-Do List
+
+Follow these in order.
+
+## Step 1 — Run Full Daily Pipeline
+
+Run:
+
+```bash
+python -m jobs.daily_update
+```
+
+Record:
+
+```text
+Total runtime
+Price update runtime
+Indicator update runtime
+Momentum count
+Strong Uptrend count
+52W High count
+Golden Cross count
+Combined Ranking count
+```
+
+---
+
+## Step 2 — Save Daily Snapshot
+
+Run:
+
+```sql
+SELECT
+    l.symbol,
+    sr.score
+FROM screener_results sr
+JOIN listings l
+    ON l.id = sr.listing_id
+WHERE sr.screener_name = 'COMBINED_RANKING'
+ORDER BY sr.score DESC
+LIMIT 20;
+```
+
+Save output into:
+
+```text
+reports/
+    combined_ranking_YYYY_MM_DD.csv
+```
+
+This becomes your first research archive.
+
+---
+
+## Step 3 — Inspect Top 20 Stocks
+
+For the top 10-20 symbols:
+
+Check:
+
+```text
+Price trend
+Volume
+52-week high proximity
+Sector
+```
+
+Ask:
+
+```text
+Do these look like stocks I would actually consider buying?
+```
+
+If many look weak, ranking needs improvement.
+
+If most look strong, ranking is doing its job.
+
+---
+
+## Step 4 — Validate Backtest
+
+Run Strong Uptrend backtest again with a different period.
+
+Example:
+
+```python
+START_DATE = "2020-01-01"
+END_DATE   = "2023-01-01"
+```
+
+Then:
+
+```python
+START_DATE = "2021-01-01"
+END_DATE   = "2024-01-01"
+```
+
+Record:
+
+```text
+Average Return
+Win Rate
+Best Return
+Worst Return
+```
+
+We're checking for consistency.
+
+---
+
+## Step 5 — Build Backtest V2 Plan
+
+Do not code yet.
+
+Just decide what metrics you want:
+
+```text
+CAGR
+Max Drawdown
+Sharpe Ratio
+Portfolio Growth Curve
+Benchmark Comparison
+```
+
+We'll implement these next.
+
+---
+
+## Step 6 — Run a Momentum Backtest
+
+Goal:
+
+```text
+Compare
+
+Strong Uptrend
+vs
+Momentum
+```
+
+We want to know:
+
+```text
+Which produces:
+Higher returns?
+Higher win rate?
+Lower volatility?
+```
+
+This will be the first real research result from your platform.
+
+---
+
+# What We Will Build Next Session
+
+Assuming tomorrow goes well:
+
+```text
+1. Backtest Momentum
+2. Backtest 52 Week High
+3. Backtest Combined Ranking
+4. Add CAGR
+5. Add Drawdown
+6. Add Benchmark Comparison (Nifty)
+```
+
+At that point you'll move from:
+
+```text
+Stock Screener
+```
+
+to:
+
+```text
+Quantitative Research Platform
+```
+
+which is the stage where the project starts generating evidence instead of just stock lists.
