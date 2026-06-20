@@ -15,13 +15,29 @@ GOLDEN_CROSS_WEIGHT = 15
 
 def load_screeners():
 
+    latest_date = pd.read_sql(
+        """
+        SELECT MAX(trade_date) AS trade_date
+        FROM screener_results
+        WHERE screener_name IN
+        (
+            'MOMENTUM',
+            'STRONG_UPTREND',
+            'FIFTY_TWO_WEEK_HIGH',
+            'GOLDEN_CROSS'
+        )
+        """,
+        engine
+    ).iloc[0]["trade_date"]
+
     query = """
     SELECT
         screener_name,
         listing_id,
         trade_date
     FROM screener_results
-    WHERE screener_name IN
+    WHERE trade_date = %(trade_date)s
+    AND screener_name IN
     (
         'MOMENTUM',
         'STRONG_UPTREND',
@@ -30,7 +46,13 @@ def load_screeners():
     )
     """
 
-    return pd.read_sql(query, engine)
+    return pd.read_sql(
+        query,
+        engine,
+        params={
+            "trade_date": latest_date
+        }
+    )
 
 
 def calculate_scores(df):
@@ -168,7 +190,7 @@ def print_top_20(scores):
 def run():
 
     df = load_screeners()
-
+    print(df["screener_name"].value_counts())
     if df.empty:
 
         print("No screener results found.")

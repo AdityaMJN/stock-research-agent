@@ -1,193 +1,89 @@
 import pandas as pd
 
 from sqlalchemy import text
-from tqdm import tqdm
 
 from database.connection import engine
 
 
-def calculate_return(current_price, old_price):
+SCREENER_NAME = "MOMENTUM"
 
-    if old_price is None:
-        return None
-
-    if old_price <= 0:
-        return None
-
-    return ((current_price - old_price) / old_price) * 100
+TOP_STOCKS = 100
 
 
-def run():
+def get_latest_trade_date():
 
-    listings = pd.read_sql(
-        """
-        SELECT DISTINCT listing_id
-        FROM daily_prices
-        ORDER BY listing_id
-        """,
-        engine
-    )
+    query = """
+    SELECT MAX(trade_date) AS trade_date
+    FROM technical_indicators
+    WHERE momentum_score IS NOT NULL
+    """
 
-    results = []
-
-    for _, listing_row in tqdm(
-        listings.iterrows(),
-        total=len(listings)
-    ):
-
-        listing_id = int(
-            listing_row["listing_id"]
-        )
-
-        df = pd.read_sql(
-            """
-            SELECT
-                trade_date,
-                close_price
-            FROM daily_prices
-            WHERE listing_id = %(listing_id)s
-            ORDER BY trade_date
-            """,
-            engine,
-            params={
-                "listing_id": listing_id
-            }
-        )
-
-        if len(df) < 126:
-            continue
-
-        current_price = float(
-            df.iloc[-1]["close_price"]
-        )
-
-        if current_price < 20:
-            continue
-
-        price_3m = float(
-            df.iloc[-63]["close_price"]
-        )
-
-        price_6m = float(
-            df.iloc[-126]["close_price"]
-        )
-
-        if price_6m < 20:
-            continue
-
-        return_3m = calculate_return(
-            current_price,
-            price_3m
-        )
-
-        return_6m = calculate_return(
-            current_price,
-            price_6m
-        )
-
-        momentum_score = (
-            (return_3m * 0.4)
-            +
-            (return_6m * 0.6)
-        )
-
-        results.append(
-            {
-                "listing_id": listing_id,
-                "return_3m": round(
-                    return_3m,
-                    2
-                ),
-                "return_6m": round(
-                    return_6m,
-                    2
-                ),
-                "momentum_score": round(
-                    momentum_score,
-                    2
-                )
-            }
-        )
-
-    results_df = pd.DataFrame(results)
-
-    symbols_df = pd.read_sql(
-        """
-        SELECT
-
-            l.id AS listing_id,
-            l.symbol,
-            c.company_name
-
-        FROM listings l
-
-        JOIN companies c
-            ON c.id = l.company_id
-        """,
-        engine
-    )
-
-    results_df = results_df.merge(
-        symbols_df,
-        on="listing_id",
-        how="left"
-    )
-
-    results_df = results_df[
-        [
-            "listing_id",
-            "symbol",
-            "company_name",
-            "return_3m",
-            "return_6m",
-            "momentum_score"
-        ]
-    ]
-
-    results_df = results_df.sort_values(
-        "momentum_score",
-        ascending=False
-    )
-
-    print()
-    print(results_df.head(50))
-
-    print()
-    print(
-        f"Stocks Found: "
-        f"{len(results_df)}"
-    )
-
-    top_stocks = results_df.head(100)
-
-    latest_trade_date = pd.read_sql(
-        """
-        SELECT MAX(trade_date) AS trade_date
-        FROM daily_prices
-        """,
+    return pd.read_sql(
+        query,
         engine
     ).iloc[0]["trade_date"]
+
+
+def load_candidates(trade_date):
+
+    query = """
+    SELECT
+        ti.listing_id,
+        ti.return_3m,
+        ti.return_6m,
+        ti.momentum_score,
+        dp.close_price
+
+    FROM technical_indicators ti
+
+    JOIN daily_prices dp
+      ON dp.listing_id = ti.listing_id
+     AND dp.trade_date = ti.trade_date
+
+    WHERE ti.trade_date = %(trade_date)s
+
+      AND ti.momentum_score IS NOT NULL
+
+      AND dp.close_price >= 20
+
+    ORDER BY
+        ti.momentum_score DESC
+    """
+
+    return pd.read_sql(
+        query,
+        engine,
+        params={
+            "trade_date": trade_date
+        }
+    )
+
+
+def save_results(df, trade_date):
 
     with engine.begin() as conn:
 
         conn.execute(
             text("""
-                DELETE FROM screener_results
-                WHERE screener_name = 'Momentum'
-            """)
+            DELETE FROM screener_results
+            WHERE screener_name = :screener_name
+            """),
+            {
+                "screener_name": SCREENER_NAME
+            }
         )
 
     records = []
 
-    for _, row in top_stocks.iterrows():
+    for _, row in df.iterrows():
 
         records.append(
             {
-                "screener_name": "Momentum",
+                "screener_name": SCREENER_NAME,
                 "listing_id": int(
                     row["listing_id"]
                 ),
-                "trade_date": latest_trade_date,
+                "trade_date": trade_date,
                 "score": float(
                     row["momentum_score"]
                 )
@@ -198,29 +94,89 @@ def run():
 
         conn.execute(
             text("""
-                INSERT INTO screener_results
-                (
-                    screener_name,
-                    listing_id,
-                    trade_date,
-                    score
-                )
-                VALUES
-                (
-                    :screener_name,
-                    :listing_id,
-                    :trade_date,
-                    :score
-                )
+            INSERT INTO screener_results
+            (
+                screener_name,
+                listing_id,
+                trade_date,
+                score
+            )
+            VALUES
+            (
+                :screener_name,
+                :listing_id,
+                :trade_date,
+                :score
+            )
             """),
             records
         )
 
+
+def run():
+
+    trade_date = get_latest_trade_date()
+
+    df = load_candidates(
+        trade_date
+    )
+
+    if df.empty:
+
+        print(
+            "No candidates found."
+        )
+        return
+
+    df = df.head(
+        TOP_STOCKS
+    )
+
+    symbols = pd.read_sql(
+        """
+        SELECT
+            id,
+            symbol
+        FROM listings
+        """,
+        engine
+    )
+
+    df = df.merge(
+        symbols,
+        left_on="listing_id",
+        right_on="id",
+        how="left"
+    )
+
+    print()
+    print("=" * 80)
+    print("TOP MOMENTUM STOCKS")
+    print("=" * 80)
+
+    print(
+        df[
+            [
+                "symbol",
+                "return_3m",
+                "return_6m",
+                "momentum_score"
+            ]
+        ]
+        .head(20)
+        .to_string(index=False)
+    )
+
+    save_results(
+        df,
+        trade_date
+    )
+
     print()
     print(
-        f"Saved {len(records)} "
-        f"Momentum results"
+        f"Saved {len(df)} Momentum results"
     )
+
 
 def main():
     run()

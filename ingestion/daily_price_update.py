@@ -107,7 +107,6 @@ def save_prices(df, listing_id):
 def run():
 
     listings = get_all_listings()
-    listings = listings.head(50)
 
     print(f"Found {len(listings)} listings")
 
