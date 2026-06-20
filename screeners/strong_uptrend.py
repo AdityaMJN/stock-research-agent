@@ -8,7 +8,21 @@ from database.connection import engine
 SCREENER_NAME = "STRONG_UPTREND"
 
 
+def get_latest_trade_date():
+
+    query = """
+    SELECT MAX(trade_date) AS trade_date
+    FROM technical_indicators
+    """
+
+    return pd.read_sql(
+        query,
+        engine
+    ).iloc[0]["trade_date"]
+
+
 def calculate_trend_score(row):
+
     return (
         row["rsi14"] * 0.4
         + row["pct_above_sma20"] * 0.3
@@ -17,129 +31,184 @@ def calculate_trend_score(row):
     )
 
 
-def load_candidates():
+def load_candidates(trade_date):
 
     query = """
     SELECT
-        listing_id,
-        trade_date,
-        symbol,
-        close_price,
-        sma20,
-        sma50,
-        sma200,
-        rsi14,
+        ti.listing_id,
+        ti.trade_date,
+        l.symbol,
+
+        dp.close_price,
+
+        ti.sma20,
+        ti.sma50,
+        ti.sma200,
+        ti.rsi14,
 
         ROUND(
-            ((close_price - sma20) / NULLIF(sma20, 0)) * 100,
+            (
+                (dp.close_price - ti.sma20)
+                / NULLIF(ti.sma20, 0)
+            ) * 100,
             2
         ) AS pct_above_sma20,
 
         ROUND(
-            ((close_price - sma50) / NULLIF(sma50, 0)) * 100,
+            (
+                (dp.close_price - ti.sma50)
+                / NULLIF(ti.sma50, 0)
+            ) * 100,
             2
         ) AS pct_above_sma50,
 
         ROUND(
-            ((close_price - sma200) / NULLIF(sma200, 0)) * 100,
+            (
+                (dp.close_price - ti.sma200)
+                / NULLIF(ti.sma200, 0)
+            ) * 100,
             2
         ) AS pct_above_sma200
 
-    FROM latest_stock_snapshot
+    FROM technical_indicators ti
 
-    WHERE close_price > sma20
-      AND sma20 > sma50
-      AND sma50 > sma200
-      AND rsi14 > 60
+    JOIN daily_prices dp
+      ON dp.listing_id = ti.listing_id
+     AND dp.trade_date = ti.trade_date
+
+    JOIN listings l
+      ON l.id = ti.listing_id
+
+    WHERE ti.trade_date = %(trade_date)s
+
+      AND dp.close_price > ti.sma20
+      AND ti.sma20 > ti.sma50
+      AND ti.sma50 > ti.sma200
+      AND ti.rsi14 > 60
     """
 
-    return pd.read_sql(query, engine)
+    return pd.read_sql(
+        query,
+        engine,
+        params={
+            "trade_date": trade_date
+        }
+    )
 
 
-def save_results(df):
+def save_results(
+    df,
+    trade_date
+):
 
     if df.empty:
-        print("No Strong Uptrend stocks found.")
-        return
 
-    latest_trade_date = df["trade_date"].max()
+        print(
+            "No Strong Uptrend stocks found."
+        )
+        return
 
     with engine.begin() as conn:
 
         conn.execute(
-            text(
-                """
-                DELETE FROM screener_results
-                WHERE screener_name = :screener_name
-                  AND trade_date = :trade_date
-                """
-            ),
-            {
-                "screener_name": SCREENER_NAME,
-                "trade_date": latest_trade_date,
-            },
-        )
-
+        text("""
+        DELETE FROM screener_results
+        WHERE screener_name = :screener_name
+        AND trade_date = :trade_date
+        """),
+        {
+            "screener_name": SCREENER_NAME,
+            "trade_date": trade_date
+        }
+    )
         records = [
             {
-                "screener_name": SCREENER_NAME,
-                "listing_id": int(row["listing_id"]),
-                "trade_date": row["trade_date"],
-                "score": float(row["score"]),
+                "screener_name":
+                    SCREENER_NAME,
+
+                "listing_id":
+                    int(
+                        row["listing_id"]
+                    ),
+
+                "trade_date":
+                    trade_date,
+
+                "score":
+                    float(
+                        row["score"]
+                    ),
             }
             for _, row in df.iterrows()
         ]
 
         conn.execute(
-            text(
-                """
-                INSERT INTO screener_results
-                (
-                    screener_name,
-                    listing_id,
-                    trade_date,
-                    score,
-                    created_at
-                )
-                VALUES
-                (
-                    :screener_name,
-                    :listing_id,
-                    :trade_date,
-                    :score,
-                    NOW()
-                )
-                """
-            ),
-            records,
+            text("""
+            INSERT INTO screener_results
+            (
+                screener_name,
+                listing_id,
+                trade_date,
+                score,
+                created_at
+            )
+            VALUES
+            (
+                :screener_name,
+                :listing_id,
+                :trade_date,
+                :score,
+                NOW()
+            )
+            """),
+            records
         )
 
-    print(f"Saved {len(df)} Strong Uptrend stocks.")
+    print(
+        f"Saved {len(df)} "
+        f"Strong Uptrend stocks."
+    )
 
 
-def run():
+def run(trade_date=None):
 
-    print("Loading Strong Uptrend candidates...")
+    if trade_date is None:
 
-    df = load_candidates()
+        trade_date = (
+            get_latest_trade_date()
+        )
+
+    print()
+    print("=" * 80)
+    print(
+        f"STRONG UPTREND "
+        f"({trade_date})"
+    )
+    print("=" * 80)
+
+    df = load_candidates(
+        trade_date
+    )
 
     if df.empty:
-        print("No candidates found.")
-        return
+
+        print(
+            f"No candidates found "
+            f"for {trade_date}"
+        )
+        return pd.DataFrame()
 
     df["score"] = df.apply(
         calculate_trend_score,
-        axis=1,
+        axis=1
     )
 
     df = df.sort_values(
         by="score",
-        ascending=False,
+        ascending=False
     )
 
     print()
-    print("Top 20 Strong Uptrend Stocks")
-    print("=" * 80)
 
     print(
         df[
@@ -149,18 +218,31 @@ def run():
                 "rsi14",
                 "pct_above_sma20",
                 "pct_above_sma50",
-                "pct_above_sma200",
+                "pct_above_sma200"
             ]
         ]
         .head(20)
         .to_string(index=False)
     )
 
-    save_results(df)
+    save_results(
+        df,
+        trade_date
+    )
 
     print()
-    print(f"Total qualifying stocks: {len(df)}")
+
+    print(
+        f"Total qualifying stocks: "
+        f"{len(df)}"
+    )
+
+    return df
+
+
+def main():
+    run()
 
 
 if __name__ == "__main__":
-    run()
+    main()

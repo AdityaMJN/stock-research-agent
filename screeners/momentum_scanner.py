@@ -59,19 +59,24 @@ def load_candidates(trade_date):
     )
 
 
-def save_results(df, trade_date):
+def save_results(
+    df,
+    trade_date
+):
 
     with engine.begin() as conn:
 
         conn.execute(
-            text("""
-            DELETE FROM screener_results
-            WHERE screener_name = :screener_name
-            """),
-            {
-                "screener_name": SCREENER_NAME
-            }
-        )
+        text("""
+        DELETE FROM screener_results
+        WHERE screener_name = :screener_name
+        AND trade_date = :trade_date
+        """),
+        {
+            "screener_name": SCREENER_NAME,
+            "trade_date": trade_date
+        }
+    )
 
     records = []
 
@@ -79,14 +84,21 @@ def save_results(df, trade_date):
 
         records.append(
             {
-                "screener_name": SCREENER_NAME,
-                "listing_id": int(
-                    row["listing_id"]
-                ),
-                "trade_date": trade_date,
-                "score": float(
-                    row["momentum_score"]
-                )
+                "screener_name":
+                    SCREENER_NAME,
+
+                "listing_id":
+                    int(
+                        row["listing_id"]
+                    ),
+
+                "trade_date":
+                    trade_date,
+
+                "score":
+                    float(
+                        row["momentum_score"]
+                    )
             }
         )
 
@@ -113,9 +125,21 @@ def save_results(df, trade_date):
         )
 
 
-def run():
+def run(trade_date=None):
 
-    trade_date = get_latest_trade_date()
+    if trade_date is None:
+
+        trade_date = (
+            get_latest_trade_date()
+        )
+
+    print()
+    print("=" * 80)
+    print(
+        f"MOMENTUM SCREENER "
+        f"({trade_date})"
+    )
+    print("=" * 80)
 
     df = load_candidates(
         trade_date
@@ -124,9 +148,10 @@ def run():
     if df.empty:
 
         print(
-            "No candidates found."
+            f"No candidates found for "
+            f"{trade_date}"
         )
-        return
+        return pd.DataFrame()
 
     df = df.head(
         TOP_STOCKS
@@ -150,9 +175,6 @@ def run():
     )
 
     print()
-    print("=" * 80)
-    print("TOP MOMENTUM STOCKS")
-    print("=" * 80)
 
     print(
         df[
@@ -173,9 +195,13 @@ def run():
     )
 
     print()
+
     print(
-        f"Saved {len(df)} Momentum results"
+        f"Saved {len(df)} "
+        f"Momentum results"
     )
+
+    return df
 
 
 def main():
