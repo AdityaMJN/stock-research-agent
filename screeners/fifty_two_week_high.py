@@ -3,22 +3,13 @@ import pandas as pd
 from sqlalchemy import text
 
 from database.connection import engine
+from utils.trade_dates import (
+    get_latest_complete_trade_date
+)
+
 
 
 SCREENER_NAME = "FIFTY_TWO_WEEK_HIGH"
-
-
-def get_latest_trade_date():
-
-    query = """
-    SELECT MAX(trade_date) AS trade_date
-    FROM daily_prices
-    """
-
-    return pd.read_sql(
-        query,
-        engine
-    ).iloc[0]["trade_date"]
 
 
 def load_candidates(trade_date):
@@ -170,7 +161,7 @@ def run(trade_date=None):
     if trade_date is None:
 
         trade_date = (
-            get_latest_trade_date()
+            get_latest_complete_trade_date()
         )
 
     print()

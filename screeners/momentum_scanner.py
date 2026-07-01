@@ -4,24 +4,14 @@ from sqlalchemy import text
 
 from database.connection import engine
 
+from utils.trade_dates import (
+    get_latest_complete_trade_date
+)
+
 
 SCREENER_NAME = "MOMENTUM"
 
 TOP_STOCKS = 100
-
-
-def get_latest_trade_date():
-
-    query = """
-    SELECT MAX(trade_date) AS trade_date
-    FROM technical_indicators
-    WHERE momentum_score IS NOT NULL
-    """
-
-    return pd.read_sql(
-        query,
-        engine
-    ).iloc[0]["trade_date"]
 
 
 def load_candidates(trade_date):
@@ -130,7 +120,7 @@ def run(trade_date=None):
     if trade_date is None:
 
         trade_date = (
-            get_latest_trade_date()
+            get_latest_complete_trade_date()
         )
 
     print()

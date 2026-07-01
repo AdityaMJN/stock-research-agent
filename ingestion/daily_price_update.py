@@ -163,5 +163,20 @@ def run():
     )
 
 
+def get_latest_trade_date():
+
+    query = """
+    SELECT
+        MAX(trade_date) AS trade_date
+    FROM daily_prices
+    """
+
+    df = pd.read_sql(
+        query,
+        engine
+    )
+
+    return df.iloc[0]["trade_date"]
+
 if __name__ == "__main__":
     run()

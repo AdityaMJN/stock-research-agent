@@ -4,6 +4,10 @@ from sqlalchemy import text
 
 from database.connection import engine
 
+from utils.trade_dates import (
+    get_latest_complete_trade_date
+)
+
 
 PORTFOLIOS = [
     ("TOP10", 10),
@@ -158,7 +162,7 @@ def print_portfolio(
     )
 
 
-def run():
+def run(trade_date=None):
 
     rankings = load_rankings()
 
@@ -169,10 +173,10 @@ def run():
         )
         return
 
-    trade_date = (
-        rankings["trade_date"]
-        .max()
-    )
+    if trade_date is None:
+        trade_date = get_latest_complete_trade_date()
+    
+    rankings = rankings[rankings["trade_date"]== trade_date].copy()
 
     print()
     print(

@@ -4,21 +4,12 @@ from sqlalchemy import text
 
 from database.connection import engine
 
+from utils.trade_dates import (
+    get_latest_complete_trade_date
+)
+
 
 SCREENER_NAME = "STRONG_UPTREND"
-
-
-def get_latest_trade_date():
-
-    query = """
-    SELECT MAX(trade_date) AS trade_date
-    FROM technical_indicators
-    """
-
-    return pd.read_sql(
-        query,
-        engine
-    ).iloc[0]["trade_date"]
 
 
 def calculate_trend_score(row):
@@ -173,10 +164,7 @@ def save_results(
 def run(trade_date=None):
 
     if trade_date is None:
-
-        trade_date = (
-            get_latest_trade_date()
-        )
+        trade_date = (get_latest_complete_trade_date())
 
     print()
     print("=" * 80)

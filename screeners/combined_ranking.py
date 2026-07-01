@@ -4,6 +4,10 @@ from sqlalchemy import text
 
 from database.connection import engine
 
+from utils.trade_dates import (
+    get_latest_complete_trade_date
+)
+
 
 SCREENER_NAME = "COMBINED_RANKING"
 
@@ -11,26 +15,6 @@ MOMENTUM_WEIGHT = 35
 STRONG_UPTREND_WEIGHT = 30
 FIFTY_TWO_WEEK_HIGH_WEIGHT = 20
 GOLDEN_CROSS_WEIGHT = 15
-
-
-def get_latest_trade_date():
-
-    query = """
-    SELECT MAX(trade_date) AS trade_date
-    FROM screener_results
-    WHERE screener_name IN
-    (
-        'MOMENTUM',
-        'STRONG_UPTREND',
-        'FIFTY_TWO_WEEK_HIGH',
-        'GOLDEN_CROSS'
-    )
-    """
-
-    return pd.read_sql(
-        query,
-        engine
-    ).iloc[0]["trade_date"]
 
 
 def load_screeners(trade_date):
@@ -285,10 +269,7 @@ def print_top_20(ranked_df):
 def run(trade_date=None):
 
     if trade_date is None:
-
-        trade_date = (
-            get_latest_trade_date()
-        )
+        trade_date = (get_latest_complete_trade_date())
 
     print()
     print("=" * 100)
