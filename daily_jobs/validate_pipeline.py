@@ -24,7 +24,7 @@ def print_pass(message):
 
     PASS += 1
 
-    print(f"✓ {message}")
+    print(f"[OK] {message}")
 
 
 def print_fail(message):
@@ -33,7 +33,7 @@ def print_fail(message):
 
     FAIL += 1
 
-    print(f"✗ {message}")
+    print(f"[FAIL] {message}")
 
 
 def check_database():

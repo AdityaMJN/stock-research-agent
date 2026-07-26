@@ -20,6 +20,37 @@ The long-term vision is to evolve the platform into a complete stock intelligenc
 
 # Current Status
 
+## Project Status (Updated July 2026)
+
+The project has moved beyond the backend data pipeline into a working local application experience.
+
+### What is working now
+
+- A FastAPI backend is running locally with Swagger UI support.
+- The frontend dashboard is connected to live API endpoints instead of placeholder/mock-only content.
+- The main research pages now render populated data for:
+  - Dashboard
+  - Stocks
+  - Screeners
+  - Portfolio
+  - Rules
+  - Backtesting
+  - Jobs
+
+### Local access
+
+- Dashboard: http://localhost:5173
+- Swagger UI: http://localhost:8000/docs
+
+### Recent implementation highlights
+
+- Added backend endpoints for stocks, dashboard metrics, screeners, portfolios, rules, backtesting, and jobs.
+- Wired the React/Vite frontend to these endpoints.
+- Added frontend pages for Backtesting and Jobs with real data tables.
+- Added local setup documentation and environment configuration for the frontend.
+
+---
+
 ## Data Layer
 
 ### Companies

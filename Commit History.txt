@@ -1,0 +1,68 @@
+Commit History
+Date: 2026-07-26
+
+Project Status Today
+====================
+Stock Research Agent is now running locally with a working frontend dashboard and a live FastAPI backend for the main research pages.
+
+What has been added
+-------------------
+- A FastAPI backend entrypoint in main.py with endpoints for:
+  - /health
+  - /api/v1/stocks
+  - /api/v1/dashboard
+  - /api/v1/screeners
+  - /api/v1/portfolios
+  - /api/v1/rules
+  - /api/v1/backtesting
+  - /api/v1/jobs
+
+- Frontend dashboard pages now display populated data instead of empty placeholder content.
+- Added Swagger UI support for API testing at http://localhost:8000/docs.
+- Added a frontend README with run instructions.
+- Added a frontend .env file to point the app at the local backend and disable mocks.
+- Added frontend API adapters for backtesting and jobs data.
+
+Files added or changed
+----------------------
+- main.py
+- frontend/README.md
+- frontend/.env
+- frontend/src/api/backtestingApi.ts
+- frontend/src/api/jobsApi.ts
+- frontend/src/pages/BacktestingPage.tsx
+- frontend/src/pages/JobsPage.tsx
+
+Why these changes were made
+---------------------------
+- To replace mock-only or placeholder UI behavior with real, data-driven pages.
+- To make the dashboard and related pages functional in a local development environment.
+- To support API testing and frontend-backend integration.
+
+What the UI currently displays
+------------------------------
+- Dashboard: KPI cards, momentum stocks, buy signals, recent jobs, portfolio summary
+- Stocks: stock table with symbol, company, sector, price, momentum, and RSI
+- Screeners: screener cards with candidate counts and status
+- Portfolio: portfolio summary table with value and return
+- Rules: rules table with weights and active status
+- Backtesting: strategy summary, equity curve, and benchmark tables
+- Jobs: pipeline activity list with timestamps and statuses
+
+Recent updates (2026-07-26)
+---------------------------
+- Added Home dashboard action buttons for Validate Pipeline and Full Portfolio Run.
+- Added live job output feedback so the UI shows when a process has started and is running.
+- Added explicit status messaging such as "Starting..." and "Running..." to make long-running jobs feel responsive.
+- Confirmed the frontend build still succeeds after the UI feedback updates.
+
+Current local run URLs
+----------------------
+- Dashboard: http://localhost:5173
+- Swagger UI: http://localhost:8000/docs
+
+Current project state
+---------------------
+- Frontend and backend are both runnable locally.
+- The main dashboard sections are wired to live endpoints.
+- The project is now in a functional demo-ready state for local UI/API testing.

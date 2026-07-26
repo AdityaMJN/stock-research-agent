@@ -1,0 +1,75 @@
+import { ChartBarIcon, ClockIcon, DocumentChartBarIcon, RectangleStackIcon, WalletIcon } from '@heroicons/react/24/outline'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { dashboardApi } from '../api/dashboardApi'
+import { jobsApi, type JobExecution } from '../api/jobsApi'
+import { Card } from '../components/Card'
+import { DataTable } from '../components/DataTable'
+import { ErrorState } from '../components/ErrorState'
+import { LoadingSpinner } from '../components/LoadingSpinner'
+import { MetricCard } from '../components/MetricCard'
+import { PageHeader } from '../components/PageHeader'
+import { StatusBadge } from '../components/StatusBadge'
+import { formatCurrency, formatDateTime, formatNumber } from '../utils/formatters'
+import type { JobSummary, PortfolioSummary, RankedStock } from '../types/dashboard'
+
+const stockColumns = [
+  { key: 'symbol', header: 'Symbol', render: (stock: RankedStock) => <span className="font-semibold">{stock.symbol}</span> },
+  { key: 'company', header: 'Company', render: (stock: RankedStock) => <span className="text-slate-500 dark:text-slate-400">{stock.companyName}</span> },
+  { key: 'score', header: 'Score', render: (stock: RankedStock) => stock.score.toFixed(1) },
+  { key: 'change', header: 'Change', render: (stock: RankedStock) => <span className={stock.changePercent >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}>{stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%</span> },
+]
+
+export function DashboardPage() {
+  const query = useQuery({ queryKey: ['dashboard'], queryFn: () => dashboardApi.getDashboard() })
+  const [activeJob, setActiveJob] = useState<JobExecution | null>(null)
+  const [jobOutput, setJobOutput] = useState<string[]>([])
+  const [jobRunning, setJobRunning] = useState(false)
+  const [jobStatusMessage, setJobStatusMessage] = useState('Idle')
+
+  useEffect(() => {
+    if (!activeJob || activeJob.status !== 'running') return
+
+    const timer = window.setInterval(async () => {
+      try {
+        const latest = await jobsApi.getJob(activeJob.id)
+        setActiveJob(latest)
+        setJobOutput(latest.output ?? [])
+        if (latest.status !== 'running') {
+          window.clearInterval(timer)
+          setJobRunning(false)
+        }
+      } catch {
+        window.clearInterval(timer)
+        setJobRunning(false)
+      }
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [activeJob?.id, activeJob?.status])
+
+  const startJob = async (command: 'full-portfolio-run' | 'validate-pipeline') => {
+    setJobOutput([])
+    setJobRunning(true)
+    setJobStatusMessage(command === 'full-portfolio-run' ? 'Starting Full Portfolio Run...' : 'Starting Validate Pipeline...')
+    try {
+      const job = await jobsApi.runJob(command)
+      setActiveJob(job)
+      setJobOutput(job.output ?? [])
+      setJobStatusMessage(job.status === 'running' ? 'Job started successfully' : 'Job finished')
+    } catch (error) {
+      setJobOutput([`Failed to start job: ${error instanceof Error ? error.message : String(error)}`])
+      setJobRunning(false)
+      setJobStatusMessage('Failed to start job')
+    }
+  }
+
+  if (query.isLoading) return <div className="page-container"><LoadingSpinner /></div>
+  if (query.isError || !query.data) return <div className="page-container"><ErrorState onRetry={() => query.refetch()} /></div>
+  const { metrics, topMomentumStocks, latestBuySignals, recentJobs, portfolios } = query.data
+  return <div className="page-container"><PageHeader title="Market Overview" description="Operational view of the NSE research pipeline and model outputs." breadcrumbs={['Research', 'Dashboard']} /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><MetricCard label="Stocks Tracked" value={formatNumber(metrics.stocksTracked)} icon={<ChartBarIcon className="h-5 w-5" />} /><MetricCard label="Latest Update" value={formatDateTime(metrics.latestUpdate).split(',')[0]} detail={formatDateTime(metrics.latestUpdate).split(',')[1]} icon={<ClockIcon className="h-5 w-5" />} /><MetricCard label="Indicators" value={<StatusBadge status={metrics.indicatorsStatus} />} icon={<DocumentChartBarIcon className="h-5 w-5" />} /><MetricCard label="Screeners" value={<StatusBadge status={metrics.screenersStatus} />} icon={<RectangleStackIcon className="h-5 w-5" />} /><MetricCard label="Portfolios" value={metrics.portfolioCount} icon={<WalletIcon className="h-5 w-5" />} /></div><div className="grid gap-6 xl:grid-cols-2"><Card className="xl:col-span-2"><div className="panel-header"><h2 className="font-semibold">Run Pipeline Jobs</h2><div className="flex gap-2"><button onClick={() => void startJob('validate-pipeline')} className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">Validate Pipeline</button><button onClick={() => void startJob('full-portfolio-run')} className="rounded bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700">Full Portfolio Run</button></div></div><div className="mt-4 rounded-lg border border-slate-200 bg-slate-950/95 p-4 text-sm text-slate-100 dark:border-slate-800"><div className="mb-2 flex items-center justify-between"><div><p className="font-medium">Live output</p><p className="mt-1 text-xs text-slate-400">{jobStatusMessage}</p></div><StatusBadge status={activeJob?.status === 'failed' ? 'error' : activeJob?.status === 'completed' ? 'healthy' : jobRunning ? 'neutral' : 'neutral'} /></div><pre className="max-h-96 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5">{jobOutput.length ? jobOutput.join('\n') : (jobRunning ? 'Starting job, please wait...' : 'Press a button to start a job and watch the console-style output here.')}</pre></div></Card><DashboardTable title="Top Momentum Stocks" data={topMomentumStocks} /><DashboardTable title="Latest Buy Signals" data={latestBuySignals} /><RecentJobs jobs={recentJobs} /><PortfolioSummary portfolios={portfolios} /></div></div>
+}
+
+function DashboardTable({ title, data }: { title: string; data: RankedStock[] }) { return <Card><div className="panel-header"><h2 className="font-semibold">{title}</h2><button className="text-sm font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">View all</button></div><DataTable columns={stockColumns} data={data} /></Card> }
+function RecentJobs({ jobs }: { jobs: JobSummary[] }) { return <Card><div className="panel-header"><h2 className="font-semibold">Recent Jobs</h2></div><div className="divide-y divide-slate-100 dark:divide-slate-800">{jobs.map((job) => <div className="flex items-center justify-between px-5 py-4" key={job.id}><div><p className="font-medium">{job.name}</p><p className="mt-1 text-xs text-slate-500">{formatDateTime(job.startedAt)} · {job.duration}</p></div><StatusBadge status={job.status} /></div>)}</div></Card> }
+function PortfolioSummary({ portfolios }: { portfolios: PortfolioSummary[] }) { return <Card><div className="panel-header"><h2 className="font-semibold">Portfolio Summary</h2></div><div className="divide-y divide-slate-100 dark:divide-slate-800">{portfolios.map((portfolio) => <div className="flex items-center justify-between px-5 py-4" key={portfolio.name}><div><p className="font-medium">{portfolio.name}</p><p className="mt-1 text-xs text-slate-500">{portfolio.holdings} holdings</p></div><div className="text-right"><p className="font-semibold">{formatCurrency(portfolio.value)}</p><p className={portfolio.returnPercent >= 0 ? 'text-xs text-emerald-600 dark:text-emerald-400' : 'text-xs text-rose-600'}>{portfolio.returnPercent >= 0 ? '+' : ''}{portfolio.returnPercent.toFixed(2)}%</p></div></div>)}</div></Card> }
