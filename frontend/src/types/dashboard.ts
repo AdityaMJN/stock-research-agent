@@ -3,6 +3,8 @@ export type SystemStatus = 'healthy' | 'warning' | 'error' | 'neutral'
 export interface DashboardMetrics {
   stocksTracked: number
   latestUpdate: string
+  indicatorsLastUpdated?: string | null
+  screenersLastUpdated?: string | null
   indicatorsStatus: SystemStatus
   screenersStatus: SystemStatus
   portfolioCount: number

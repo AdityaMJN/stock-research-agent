@@ -1,4 +1,4 @@
-import { ChartBarIcon, ChartPieIcon, ClockIcon, Cog6ToothIcon, HomeIcon, PresentationChartLineIcon, QueueListIcon, ScaleIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline'
+import { BookOpenIcon, ChartBarIcon, ChartPieIcon, ClockIcon, Cog6ToothIcon, HomeIcon, PresentationChartLineIcon, QueueListIcon, ScaleIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline'
 import { NavLink } from 'react-router-dom'
 import { cn } from '../utils/cn'
 
@@ -7,6 +7,7 @@ const navigation = [
   { label: 'Screeners', to: '/screeners', icon: QueueListIcon }, { label: 'Portfolio', to: '/portfolio', icon: ChartPieIcon },
   { label: 'Backtesting', to: '/backtesting', icon: PresentationChartLineIcon }, { label: 'Rules', to: '/rules', icon: ScaleIcon },
   { label: 'Jobs', to: '/jobs', icon: ClockIcon }, { label: 'Settings', to: '/settings', icon: Cog6ToothIcon },
+  { label: 'DevNotes', to: '/devnotes', icon: BookOpenIcon },
 ]
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {

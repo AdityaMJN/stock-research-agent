@@ -95,6 +95,11 @@ def build_position_sizes():
         how="left"
     )
 
+    df = df[df["close_price"].notna()].copy()
+
+    if df.empty:
+        return df
+
     target_value = (
         PORTFOLIO_VALUE
         /

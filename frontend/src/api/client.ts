@@ -5,7 +5,7 @@ export const apiClient = axios.create({
   timeout: 10_000,
 })
 
-export const useMocks = import.meta.env.VITE_USE_MOCKS !== 'false'
+export const useMocks = import.meta.env.VITE_USE_MOCKS === 'true'
 
 export const mockDelay = <T>(data: T, delay = 250): Promise<T> => new Promise((resolve) => {
   window.setTimeout(() => resolve(data), delay)

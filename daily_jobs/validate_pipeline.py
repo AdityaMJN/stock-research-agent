@@ -348,8 +348,8 @@ def check_accounts():
 
         print(
             f"    {row['portfolio_name']}"
-            f" | Cash ₹{row['cash_balance']:,.2f}"
-            f" | Total ₹{row['total_value']:,.2f}"
+            f" | Cash INR {row['cash_balance']:,.2f}"
+            f" | Total INR {row['total_value']:,.2f}"
         )
 
 

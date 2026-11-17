@@ -21,10 +21,10 @@ cp .env.example .env
 
 Default settings:
 - `VITE_API_BASE_URL=http://localhost:8000/api/v1`
-- `VITE_USE_MOCKS=true`
+- `VITE_USE_MOCKS=false`
 
-To use live API data, set:
+To force mock fallback data, set:
 
 ```env
-VITE_USE_MOCKS=false
+VITE_USE_MOCKS=true
 ```

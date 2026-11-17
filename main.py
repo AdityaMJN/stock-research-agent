@@ -7,9 +7,30 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import pandas as pd
+
+from database.connection import engine
+from utils.trade_dates import get_latest_complete_trade_date
 
 ROOT_DIR = Path(__file__).resolve().parent
 JOB_STORE: dict[str, dict] = {}
+
+
+def _read_latest_value(table_name: str, value_column: str):
+    df = pd.read_sql(
+        f"SELECT MAX({value_column}) AS last_value FROM {table_name}",
+        engine,
+    )
+    value = df.iloc[0]["last_value"]
+    return None if pd.isna(value) else value
+
+
+def _to_iso(value):
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
 
 app = FastAPI(title="Stock Research Agent API", version="1.0.0")
 
@@ -24,6 +45,23 @@ app.add_middleware(
 
 def _now_iso() -> str:
     return datetime.now().astimezone().isoformat()
+
+
+def build_all_checks_command() -> list[str]:
+    return [
+        sys.executable,
+        "-c",
+        (
+            "import subprocess, sys; "
+            "validate = subprocess.run([sys.executable, '-m', 'daily_jobs.validate_pipeline'], capture_output=True, text=True); "
+            "print(validate.stdout or ''); "
+            "print(validate.stderr or ''); "
+            "tests = subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests'], capture_output=True, text=True); "
+            "print(tests.stdout or ''); "
+            "print(tests.stderr or ''); "
+            "sys.exit(0 if validate.returncode == 0 and tests.returncode == 0 else 1)"
+        ),
+    ]
 
 
 def _start_job(job_name: str, command: list[str]) -> dict:
@@ -92,10 +130,20 @@ def list_stocks():
 
 @app.get("/api/v1/dashboard")
 def get_dashboard():
+    latest_trade_date = get_latest_complete_trade_date()
+    latest_update = _to_iso(_read_latest_value("daily_prices", "created_at"))
+    indicators_last_updated = _to_iso(_read_latest_value("technical_indicators", "trade_date"))
+    screeners_last_updated = _to_iso(_read_latest_value("screener_results", "trade_date"))
+
+    if latest_update is None and latest_trade_date is not None:
+        latest_update = latest_trade_date.isoformat()
+
     return {
         "metrics": {
             "stocksTracked": 2364,
-            "latestUpdate": "2026-07-26T09:32:00+05:30",
+            "latestUpdate": latest_update,
+            "indicatorsLastUpdated": indicators_last_updated,
+            "screenersLastUpdated": screeners_last_updated,
             "indicatorsStatus": "healthy",
             "screenersStatus": "healthy",
             "portfolioCount": 3,
@@ -197,6 +245,46 @@ def run_validate_pipeline_job():
     return _start_job(
         "Validate pipeline",
         [sys.executable, "-m", "daily_jobs.validate_pipeline"],
+    )
+
+
+@app.post("/api/v1/jobs/run/run-all-checks")
+def run_all_checks_job():
+    return _start_job(
+        "Run all checks",
+        build_all_checks_command(),
+    )
+
+
+@app.post("/api/v1/jobs/run/update-indicators")
+def run_update_indicators_job():
+    return _start_job(
+        "Update indicators",
+        [
+            sys.executable,
+            "-c",
+            (
+                "from calculations.update_indicators import run as run_indicators; "
+                "from calculations.update_momentum_indicators import run as run_momentum; "
+                "run_indicators(); run_momentum()"
+            ),
+        ],
+    )
+
+
+@app.post("/api/v1/jobs/run/run-screeners")
+def run_screeners_job():
+    return _start_job(
+        "Run screeners",
+        [
+            sys.executable,
+            "-c",
+            (
+                "from utils.trade_dates import get_latest_complete_trade_date; "
+                "from screeners.run_all_screeners import run; "
+                "run(get_latest_complete_trade_date())"
+            ),
+        ],
     )
 
 

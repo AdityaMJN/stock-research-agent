@@ -1,4 +1,4 @@
-import { ChartBarIcon, ClockIcon, DocumentChartBarIcon, RectangleStackIcon, WalletIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { ArrowPathIcon, ChartBarIcon, ClockIcon, DocumentChartBarIcon, RectangleStackIcon, WalletIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { dashboardApi } from '../api/dashboardApi'
@@ -10,7 +10,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 import { MetricCard } from '../components/MetricCard'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
-import { formatCurrency, formatDateTime, formatNumber } from '../utils/formatters'
+import { formatCurrency, formatDateOnly, formatDateTime, formatNumber } from '../utils/formatters'
 import type { JobSummary, PortfolioSummary, RankedStock } from '../types/dashboard'
 
 const stockColumns = [
@@ -49,16 +49,28 @@ export function DashboardPage() {
     return () => window.clearInterval(timer)
   }, [activeJob?.id, activeJob?.status])
 
-  const startJob = async (command: 'full-portfolio-run' | 'validate-pipeline') => {
+  const startJob = async (command: 'full-portfolio-run' | 'validate-pipeline' | 'run-all-checks' | 'update-indicators' | 'run-screeners') => {
     setJobOutput([])
     setJobRunning(true)
     setShowOutputDialog(true)
-    setJobStatusMessage(command === 'full-portfolio-run' ? 'Starting Full Portfolio Run...' : 'Starting Validate Pipeline...')
+
+    const labelMap = {
+      'full-portfolio-run': 'Starting Full Portfolio Run...',
+      'validate-pipeline': 'Starting Validate Pipeline...',
+      'run-all-checks': 'Running all checks...',
+      'update-indicators': 'Refreshing indicators...',
+      'run-screeners': 'Refreshing screeners...',
+    }
+
+    setJobStatusMessage(labelMap[command])
     try {
       const job = await jobsApi.runJob(command)
       setActiveJob(job)
       setJobOutput(job.output ?? [])
       setJobStatusMessage(job.status === 'running' ? 'Job started successfully' : 'Job finished')
+      if (job.status !== 'running') {
+        window.setTimeout(() => void query.refetch(), 1000)
+      }
     } catch (error) {
       setJobOutput([`Failed to start job: ${error instanceof Error ? error.message : String(error)}`])
       setJobRunning(false)
@@ -66,12 +78,22 @@ export function DashboardPage() {
     }
   }
 
+  const andRefresh = async (command: 'full-portfolio-run' | 'validate-pipeline' | 'run-all-checks' | 'update-indicators' | 'run-screeners') => {
+    await startJob(command)
+    window.setTimeout(() => void query.refetch(), 1200)
+  }
+
   const outputText = jobOutput.length ? jobOutput.join('\n') : (jobRunning ? 'Starting job, please wait...' : 'Press a button to start a job and watch the console-style output here.')
 
   if (query.isLoading) return <div className="page-container"><LoadingSpinner /></div>
   if (query.isError || !query.data) return <div className="page-container"><ErrorState onRetry={() => query.refetch()} /></div>
   const { metrics, topMomentumStocks, latestBuySignals, recentJobs, portfolios } = query.data
-  return <div className="page-container"><PageHeader title="Market Overview" description="Operational view of the NSE research pipeline and model outputs." breadcrumbs={['Research', 'Dashboard']} /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><MetricCard label="Stocks Tracked" value={formatNumber(metrics.stocksTracked)} icon={<ChartBarIcon className="h-5 w-5" />} /><MetricCard label="Latest Update" value={formatDateTime(metrics.latestUpdate).split(',')[0]} detail={formatDateTime(metrics.latestUpdate).split(',')[1]} icon={<ClockIcon className="h-5 w-5" />} /><MetricCard label="Indicators" value={<StatusBadge status={metrics.indicatorsStatus} />} icon={<DocumentChartBarIcon className="h-5 w-5" />} /><MetricCard label="Screeners" value={<StatusBadge status={metrics.screenersStatus} />} icon={<RectangleStackIcon className="h-5 w-5" />} /><MetricCard label="Portfolios" value={metrics.portfolioCount} icon={<WalletIcon className="h-5 w-5" />} /></div><div className="grid gap-6 xl:grid-cols-2"><Card className="xl:col-span-2"><div className="panel-header"><h2 className="font-semibold">Run Pipeline Jobs</h2><div className="flex gap-2"><button onClick={() => void startJob('validate-pipeline')} className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">Validate Pipeline</button><button onClick={() => void startJob('full-portfolio-run')} className="rounded bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700">Full Portfolio Run</button></div></div><div className="mt-4 rounded-lg border border-slate-200 bg-slate-950/95 p-4 text-sm text-slate-100 dark:border-slate-800"><div className="mb-2 flex items-center justify-between"><div><p className="font-medium">Live output</p><p className="mt-1 text-xs text-slate-400">{jobStatusMessage}</p></div><div className="flex items-center gap-2"><button onClick={() => setShowOutputDialog(true)} className="rounded border border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800">Open output</button><StatusBadge status={activeJob?.status === 'failed' ? 'error' : activeJob?.status === 'completed' ? 'healthy' : jobRunning ? 'neutral' : 'neutral'} /></div></div><p className="text-xs text-slate-400">The job stream will appear in a separate dialog while it runs.</p></div>{showOutputDialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"><div className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 bg-white p-4 text-slate-800 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"><div className="mb-3 flex items-center justify-between"><div><p className="font-semibold">Job output</p><p className="text-xs text-slate-500 dark:text-slate-400">{jobStatusMessage}</p></div><button onClick={() => setShowOutputDialog(false)} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"><XMarkIcon className="h-5 w-5" /></button></div><pre className="overflow-auto whitespace-pre-wrap font-mono text-xs leading-5">{outputText}</pre></div></div>} </Card><DashboardTable title="Top Momentum Stocks" data={topMomentumStocks} /><DashboardTable title="Latest Buy Signals" data={latestBuySignals} /><RecentJobs jobs={recentJobs} /><PortfolioSummary portfolios={portfolios} /></div></div>
+  const latestUpdateDate = metrics.latestUpdate ? new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' }).format(new Date(metrics.latestUpdate)) : 'Not available'
+  const latestUpdateYearAndTime = metrics.latestUpdate ? new Intl.DateTimeFormat('en-US', { year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(metrics.latestUpdate)) : 'Not available'
+  const indicatorsUpdatedText = formatDateTime(metrics.indicatorsLastUpdated)
+  const screenersUpdatedText = formatDateTime(metrics.screenersLastUpdated)
+
+  return <div className="page-container"><PageHeader title="Market Overview" description="Operational view of the NSE research pipeline and model outputs." breadcrumbs={['Research', 'Dashboard']} /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><MetricCard label="Stocks Tracked" value={formatNumber(metrics.stocksTracked)} icon={<ChartBarIcon className="h-5 w-5" />} /><MetricCard label="Latest Update" value={<div className="space-y-1"><div className="text-[2rem] font-semibold leading-none tracking-tight text-slate-900 dark:text-white">{latestUpdateDate}</div><div className="text-lg font-medium leading-none text-slate-700 dark:text-slate-200">{latestUpdateYearAndTime}</div></div>} action={<button onClick={() => void andRefresh('full-portfolio-run')} className="rounded border border-emerald-500/40 bg-emerald-500/10 p-2 text-emerald-300 transition hover:bg-emerald-500/20" aria-label="Refresh latest update"><ArrowPathIcon className="h-4 w-4" /></button>} icon={<ClockIcon className="h-5 w-5" />} /><MetricCard label="Indicators" value={<StatusBadge status={metrics.indicatorsStatus} />} detail={<span>Last updated: {indicatorsUpdatedText}</span>} action={<button onClick={() => void andRefresh('update-indicators')} className="rounded border border-slate-700 p-2 text-slate-300 transition hover:bg-slate-800" aria-label="Refresh indicators"><ArrowPathIcon className="h-4 w-4" /></button>} icon={<DocumentChartBarIcon className="h-5 w-5" />} /><MetricCard label="Screeners" value={<StatusBadge status={metrics.screenersStatus} />} detail={<span>Last updated: {screenersUpdatedText}</span>} action={<button onClick={() => void andRefresh('run-screeners')} className="rounded border border-slate-700 p-2 text-slate-300 transition hover:bg-slate-800" aria-label="Refresh screeners"><ArrowPathIcon className="h-4 w-4" /></button>} icon={<RectangleStackIcon className="h-5 w-5" />} /><MetricCard label="Portfolios" value={metrics.portfolioCount} icon={<WalletIcon className="h-5 w-5" />} /></div><div className="grid gap-6 xl:grid-cols-2"><Card className="xl:col-span-2"><div className="panel-header"><h2 className="font-semibold">Run Pipeline Jobs</h2><div className="flex flex-wrap gap-2"><button onClick={() => void startJob('validate-pipeline')} className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">Validate Pipeline</button><button onClick={() => void startJob('run-all-checks')} className="rounded bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700">Run All Checks</button><button onClick={() => void startJob('full-portfolio-run')} className="rounded bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700">Full Portfolio Run</button></div></div><div className="mt-4 rounded-lg border border-slate-200 bg-slate-950/95 p-4 text-sm text-slate-100 dark:border-slate-800"><div className="mb-2 flex items-center justify-between"><div><p className="font-medium">Live output</p><p className="mt-1 text-xs text-slate-400">{jobStatusMessage}</p></div><div className="flex items-center gap-2"><button onClick={() => setShowOutputDialog(true)} className="rounded border border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800">Open output</button><StatusBadge status={activeJob?.status === 'failed' ? 'error' : activeJob?.status === 'completed' ? 'healthy' : jobRunning ? 'neutral' : 'neutral'} /></div></div><p className="text-xs text-slate-400">The job stream will appear in a separate dialog while it runs.</p></div>{showOutputDialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"><div className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 bg-white p-4 text-slate-800 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"><div className="mb-3 flex items-center justify-between"><div><p className="font-semibold">Job output</p><p className="text-xs text-slate-500 dark:text-slate-400">{jobStatusMessage}</p></div><button onClick={() => setShowOutputDialog(false)} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"><XMarkIcon className="h-5 w-5" /></button></div><pre className="overflow-auto whitespace-pre-wrap font-mono text-xs leading-5">{outputText}</pre></div></div>} </Card><DashboardTable title="Top Momentum Stocks" data={topMomentumStocks} /><DashboardTable title="Latest Buy Signals" data={latestBuySignals} /><RecentJobs jobs={recentJobs} /><PortfolioSummary portfolios={portfolios} /></div></div>
 }
 
 function DashboardTable({ title, data }: { title: string; data: RankedStock[] }) { return <Card><div className="panel-header"><h2 className="font-semibold">{title}</h2><button className="text-sm font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">View all</button></div><DataTable columns={stockColumns} data={data} /></Card> }

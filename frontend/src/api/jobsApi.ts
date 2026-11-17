@@ -12,7 +12,7 @@ export interface JobExecution {
     command?: string[]
 }
 
-type JobCommand = 'full-portfolio-run' | 'validate-pipeline'
+type JobCommand = 'full-portfolio-run' | 'validate-pipeline' | 'run-all-checks' | 'update-indicators' | 'run-screeners'
 
 class JobsApi {
     async list(): Promise<JobSummary[]> {
